@@ -1,0 +1,48 @@
+openapi: 3.0.1
+info:
+  title: Invoice Reader API
+  description: An API that uses Gemini AI to extract structured data from invoice images.
+  version: 'v1'
+servers:
+  - url: https://invoice-reader-tool.vercel.app
+paths:
+  /analyze:
+    post:
+      operationId: analyzeInvoice
+      summary: Extract data from an invoice image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                invoice:
+                  type: string
+                  format: binary
+                  description: The invoice image file (JPG or PNG)
+      responses:
+        "200":
+          description: Successful extraction
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vendor_name:
+                    type: string
+                  invoice_date:
+                    type: string
+                  total_amount:
+                    type: number
+                  currency:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        description:
+                          type: string
+                        amount:
+                          type: string

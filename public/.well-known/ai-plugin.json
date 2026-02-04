@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Invoice Reader",
+  "name_for_model": "invoice_reader",
+  "description_for_human": "Extracts data from invoice images.",
+  "description_for_model": "Extract structured data (vendor, date, items, total) from an invoice image. Accepts JPG/PNG files.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://invoice-reader-tool.vercel.app/openapi.yaml"
+  },
+  "logo_url": "https://invoice-reader-tool.vercel.app/logo.png",
+  "contact_email": "support@example.com",
+  "legal_info_url": "https://example.com/legal"
+}
