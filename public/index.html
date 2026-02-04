@@ -3,170 +3,364 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Invoice Reader</title>
+    <title>InvoiceAI | Smart Extractor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { --primary: #0070f3; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 2rem; }
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f3f4f6;
+            --surface: #ffffff;
+            --text-main: #111827;
+            --text-sub: #6b7280;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: var(--text-main);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--surface);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 768px) {
+            .app-container { grid-template-columns: 350px 1fr; min-height: 600px; }
+        }
+
+        /* Sidebar / Upload Section */
+        .sidebar {
+            background: #f9fafb;
+            padding: 2rem;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2rem;
+        }
         
-        .container { width: 100%; max-width: 600px; background: var(--card); border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .brand span { color: var(--primary); }
+
+        .drop-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            background: white;
+            position: relative;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary);
+            background: #eef2ff;
+        }
+
+        .drop-zone input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .icon-upload { font-size: 2rem; color: var(--text-sub); margin-bottom: 1rem; }
         
-        header { background: var(--primary); color: white; padding: 1.5rem; text-align: center; }
-        h1 { margin: 0; font-size: 1.5rem; }
-        p { margin: 0.5rem 0 0; opacity: 0.9; }
+        .btn-analyze {
+            margin-top: 1.5rem;
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
 
-        .upload-section { padding: 2rem; text-align: center; border-bottom: 1px solid #eee; }
-        input[type="file"] { display: none; }
-        .file-label { display: inline-block; padding: 10px 20px; background: #e5e7eb; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
-        .file-label:hover { background: #d1d5db; }
-        
-        button { margin-top: 1rem; background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; width: 100%; max-width: 200px; }
-        button:disabled { background: #9ca3af; cursor: not-allowed; }
-        button:hover:not(:disabled) { opacity: 0.9; }
+        .btn-analyze:hover { background: var(--primary-hover); }
+        .btn-analyze:disabled { background: #9ca3af; cursor: not-allowed; }
 
-        .result-section { padding: 2rem; display: none; }
-        .result-section.active { display: block; animation: fadeIn 0.5s; }
+        /* Main Content / Result Section */
+        .main-content {
+            padding: 2rem;
+            position: relative;
+            overflow-y: auto;
+        }
 
-        .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-        .info-card { background: #f9fafb; padding: 1rem; border-radius: 8px; border: 1px solid #e5e7eb; }
-        .info-label { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 0.25rem; }
-        .info-value { font-size: 1.1rem; font-weight: 500; color: #111; }
-        
-        .items-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        .items-table th { text-align: left; border-bottom: 2px solid #e5e7eb; padding: 0.75rem; color: #6b7280; font-size: 0.9rem; }
-        .items-table td { padding: 0.75rem; border-bottom: 1px solid #e5e7eb; }
-        .items-table tr:last-child td { border-bottom: none; }
-        .amount-col { text-align: right; font-family: monospace; }
+        .empty-state {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-sub);
+            text-align: center;
+        }
 
-        .error-msg { color: #dc2626; background: #fef2f2; padding: 1rem; border-radius: 6px; margin-top: 1rem; display: none; text-align: center;}
+        .result-view { display: none; animation: fadeIn 0.4s ease-out; }
+        .result-view.active { display: block; }
 
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        .vendor-title { font-size: 1.5rem; font-weight: 700; color: var(--text-main); }
+        .invoice-meta { color: var(--text-sub); font-size: 0.9rem; margin-top: 4px; }
+
+        .total-badge {
+            background: #eff6ff;
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1.25rem;
+            border: 1px solid #bfdbfe;
+        }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th { text-align: left; color: var(--text-sub); font-size: 0.85rem; text-transform: uppercase; padding: 12px 8px; border-bottom: 2px solid var(--border); }
+        td { padding: 12px 8px; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+        tr:last-child td { border-bottom: none; }
+        .text-right { text-align: right; }
+
+        /* Loading Spinner */
+        .loader {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        .processing .loader { display: block; }
+        .processing .empty-text { display: none; }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .error-banner {
+            background: #fef2f2;
+            color: var(--error);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+            display: none;
+            border: 1px solid #fecaca;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <header>
-        <h1>🧾 Invoice Reader</h1>
-        <p>Upload an image to extract structured data</p>
-    </header>
+    <div class="app-container">
+        <!-- Left Sidebar -->
+        <div class="sidebar">
+            <div class="brand">
+                <span>⚡</span> InvoiceAI
+            </div>
 
-    <div class="upload-section">
-        <label for="fileInput" class="file-label" id="fileLabel">📁 Choose Invoice Image</label>
-        <input type="file" id="fileInput" accept="image/jpeg, image/png">
-        <br>
-        <button onclick="uploadInvoice()" id="uploadBtn">Analyze Invoice</button>
-        <div id="errorBox" class="error-msg"></div>
-    </div>
+            <div class="error-banner" id="errorBanner"></div>
 
-    <div id="result" class="result-section">
-        <div class="summary-grid">
-            <div class="info-card">
-                <div class="info-label">Vendor</div>
-                <div class="info-value" id="resVendor">-</div>
+            <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" accept="image/jpeg, image/png">
+                <div class="icon-upload">📄</div>
+                <p style="margin:0; font-weight:500;">Click or Drop Invoice</p>
+                <p style="margin:5px 0 0; font-size:0.8rem; color:#9ca3af;">JPG or PNG only</p>
+                <p id="fileName" style="margin-top:10px; font-weight:600; color:var(--primary); font-size:0.9rem;"></p>
             </div>
-            <div class="info-card">
-                <div class="info-label">Date</div>
-                <div class="info-value" id="resDate">-</div>
-            </div>
-            <div class="info-card" style="grid-column: span 2; background: #eff6ff; border-color: #bfdbfe;">
-                <div class="info-label">Total Amount</div>
-                <div class="info-value" id="resTotal" style="color: #1e40af; font-size: 1.5rem; font-weight: bold;">-</div>
-            </div>
+
+            <button class="btn-analyze" id="analyzeBtn" onclick="processInvoice()" disabled>
+                Analyze Invoice
+            </button>
         </div>
 
-        <h3>Line Items</h3>
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th class="amount-col">Amount</th>
-                </tr>
-            </thead>
-            <tbody id="itemsBody">
-                <!-- Items go here -->
-            </tbody>
-        </table>
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Empty State / Loading -->
+            <div id="emptyState" class="empty-state">
+                <div class="loader"></div>
+                <div class="empty-text">
+                    <div style="font-size:3rem; margin-bottom:1rem; opacity:0.3;">🧾</div>
+                    <h3 style="margin:0;">No invoice selected</h3>
+                    <p>Upload a file to see the magic happen.</p>
+                </div>
+            </div>
+
+            <!-- Result View -->
+            <div id="resultView" class="result-view">
+                <div class="header-row">
+                    <div>
+                        <div class="vendor-title" id="resVendor">Startbucks Coffee</div>
+                        <div class="invoice-meta">Date: <span id="resDate">2023-10-24</span></div>
+                    </div>
+                    <div class="total-badge" id="resTotal">$12.50</div>
+                </div>
+
+                <h3>Items Breakdown</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th class="text-right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsList">
+                        <!-- JS injects rows here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-</div>
 
-<script>
-    const fileInput = document.getElementById('fileInput');
-    const fileLabel = document.getElementById('fileLabel');
-    
-    // Update label when file is chosen
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files[0]) fileLabel.textContent = "✅ " + e.target.files[0].name;
-    });
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const emptyState = document.getElementById('emptyState');
+        const resultView = document.getElementById('resultView');
+        const errorBanner = document.getElementById('errorBanner');
 
-    async function uploadInvoice() {
-        const file = fileInput.files[0];
-        const btn = document.getElementById('uploadBtn');
-        const resultDiv = document.getElementById('result');
-        const errorBox = document.getElementById('errorBox');
-        const itemsBody = document.getElementById('itemsBody');
+        // Drag & Drop Visuals
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
 
-        if (!file) {
-            alert("Please select a file first!");
-            return;
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            if (fileInput.files[0]) {
+                fileName.textContent = fileInput.files[0].name;
+                analyzeBtn.disabled = false;
+                errorBanner.style.display = 'none';
+                analyzeBtn.textContent = "Analyze Invoice";
+            }
         }
 
-        // Reset UI
-        btn.disabled = true;
-        btn.textContent = "Processing...";
-        resultDiv.classList.remove('active');
-        errorBox.style.display = 'none';
+        async function processInvoice() {
+            const file = fileInput.files[0];
+            if (!file) return;
 
-        const formData = new FormData();
-        formData.append('invoice', file);
+            // UI Loading State
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = "Analyzing...";
+            emptyState.classList.add('processing');
+            resultView.classList.remove('active');
+            errorBanner.style.display = 'none';
 
-        try {
-            const response = await fetch('/analyze', {
-                method: 'POST',
-                body: formData
-            });
+            const formData = new FormData();
+            formData.append('invoice', file);
 
-            if (!response.ok) {
-                let msg = `Server Error (${response.status})`;
-                try { const e = await response.json(); if(e.error) msg = e.error; } catch {}
-                throw new Error(msg);
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    let msg = `Server Error (${response.status})`;
+                    try { const e = await response.json(); if(e.error) msg = e.error; } catch {}
+                    throw new Error(msg);
+                }
+
+                const data = await response.json();
+                renderInvoice(data);
+
+            } catch (err) {
+                errorBanner.textContent = err.message;
+                errorBanner.style.display = 'block';
+                emptyState.classList.remove('processing'); // Reset loading
+                analyzeBtn.textContent = "Try Again";
+                analyzeBtn.disabled = false;
             }
+        }
 
-            const data = await response.json();
+        function renderInvoice(data) {
+            // Remove loading
+            emptyState.classList.remove('processing');
+            emptyState.style.display = 'none';
+            resultView.classList.add('active');
+            analyzeBtn.textContent = "Analyze Another";
+            analyzeBtn.disabled = false;
+
+            // Fill Data
+            document.getElementById('resVendor').textContent = data.vendor_name || "Unknown Vendor";
+            document.getElementById('resDate').textContent = data.invoice_date || "Unknown Date";
             
-            // Populate Data
-            document.getElementById('resVendor').textContent = data.vendor_name || "Unknown";
-            document.getElementById('resDate').textContent = data.invoice_date || "Unknown";
-            
-            const currency = data.currency || '';
+            const currency = data.currency || '$';
             const total = data.total_amount || 0;
-            document.getElementById('resTotal').textContent = `${currency} ${total}`;
+            document.getElementById('resTotal').textContent = `${currency}${total}`;
 
-            // Populate Table
-            itemsBody.innerHTML = '';
+            const tbody = document.getElementById('itemsList');
+            tbody.innerHTML = '';
+
             if (data.items && data.items.length > 0) {
                 data.items.forEach(item => {
                     const row = `<tr>
-                        <td>${item.description || 'Item'}</td>
-                        <td class="amount-col">${currency}${item.amount || '0.00'}</td>
+                        <td>${item.description}</td>
+                        <td class="text-right">${currency}${item.amount}</td>
                     </tr>`;
-                    itemsBody.innerHTML += row;
+                    tbody.innerHTML += row;
                 });
             } else {
-                itemsBody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">No items detected</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#999; padding:20px;">No specific items found</td></tr>';
             }
-
-            // Show Result
-            resultDiv.classList.add('active');
-
-        } catch (err) {
-            errorBox.textContent = "❌ " + err.message;
-            errorBox.style.display = 'block';
-        } finally {
-            btn.disabled = false;
-            btn.textContent = "Analyze Another";
         }
-    }
-</script>
-
+    </script>
 </body>
 </html>
