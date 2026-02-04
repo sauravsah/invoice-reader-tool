@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Reader AI</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+        .container { border: 1px solid #ccc; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; color: #333; }
+        .upload-section { margin-bottom: 2rem; padding: 1rem; background: #f9f9f9; border-radius: 4px; }
+        button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        button:disabled { background: #ccc; }
+        pre { background: #eee; padding: 1rem; overflow-x: auto; border-radius: 4px; }
+        .hidden { display: none; }
+        #status { margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧾 Invoice Reader Tool</h1>
+        
+        <div class="upload-section">
+            <p>Upload an invoice (JPG/PNG) to extract data.</p>
+            <input type="file" id="fileInput" accept="image/jpeg, image/png">
+            <br><br>
+            <button onclick="uploadInvoice()" id="uploadBtn">Extract Data</button>
+            <div id="status"></div>
+        </div>
+
+        <div id="result" class="hidden">
+            <h3>Extracted Data:</h3>
+            <pre id="jsonOutput"></pre>
+        </div>
+    </div>
+
+    <script>
+        async function uploadInvoice() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const status = document.getElementById('status');
+            const btn = document.getElementById('uploadBtn');
+            const resultDiv = document.getElementById('result');
+            const jsonOutput = document.getElementById('jsonOutput');
+
+            if (!file) {
+                alert("Please select a file first!");
+                return;
+            }
+
+            // Reset UI
+            status.textContent = "Analyzing... please wait...";
+            btn.disabled = true;
+            resultDiv.classList.add('hidden');
+            jsonOutput.textContent = '';
+
+            const formData = new FormData();
+            formData.append('invoice', file);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                status.textContent = "Done!";
+                jsonOutput.textContent = JSON.stringify(data, null, 2);
+                resultDiv.classList.remove('hidden');
+            } catch (err) {
+                status.textContent = "Failed: " + err.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

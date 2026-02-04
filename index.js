@@ -4,12 +4,16 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 
 const app = express();
+const path = require('path');
 const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
+// Serve static files from 'public' folder
+app.use(express.static('public'));
+
 app.get('/', (req, res) => {
-    res.send('Invoice Reader API is running! POST an image to /analyze');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.post('/analyze', upload.single('invoice'), async (req, res) => {
