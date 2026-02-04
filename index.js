@@ -1,56 +1,65 @@
-require('dotenv').config();
+const express = require('express');
+const multer = require('multer');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const fs = require('fs');
+require('dotenv').config();
 
-// 1. Setup API
+const app = express();
+const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory
+
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-async function extractInvoiceData(imagePath) {
-  try {
-    // 2. Load Model
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+app.get('/', (req, res) => {
+    res.send('Invoice Reader API is running! POST an image to /analyze');
+});
 
-    // 3. Read Image File
-    const imageFile = fs.readFileSync(imagePath);
-    const imageBase64 = imageFile.toString('base64');
+app.post('/analyze', upload.single('invoice'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No invoice image provided' });
+        }
 
-    // 4. Construct Prompt
-    const prompt = `
-      You are an API that extracts structured data from invoices.
-      Analyze this image and return ONLY a JSON object. Do not include markdown formatting like \`\`\`json.
-      
-      Extract these fields:
-      - vendor_name (string)
-      - invoice_date (string, YYYY-MM-DD)
-      - total_amount (number)
-      - currency (string)
-      - items (array of objects with 'description' and 'amount')
-      
-      If values are missing, use null.
-    `;
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          data: imageBase64,
-          mimeType: "image/jpeg",
-        },
-      },
-    ]);
+        // Convert buffer to base64
+        const imageBase64 = req.file.buffer.toString('base64');
 
-    const response = await result.response;
-    const text = response.text();
-    
-    // 5. Output Result
-    console.log("--- Extracted Data ---");
-    console.log(text);
-    return text;
+        const prompt = `
+          You are an API that extracts structured data from invoices.
+          Analyze this image and return ONLY a JSON object. Do not include markdown formatting.
+          
+          Extract:
+          - vendor_name
+          - invoice_date (YYYY-MM-DD)
+          - total_amount
+          - currency
+          - items (array: description, amount)
+        `;
 
-  } catch (error) {
-    console.error("Error:", error.message);
-  }
-}
+        const result = await model.generateContent([
+            prompt,
+            {
+                inlineData: {
+                    data: imageBase64,
+                    mimeType: req.file.mimetype,
+                },
+            },
+        ]);
 
-// Run (Assuming file is named 'invoice.jpg')
-extractInvoiceData('invoice.jpg');
+        const response = await result.response;
+        const text = response.text();
+        
+        // Clean up markdown code blocks if present
+        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        res.json(JSON.parse(cleanText));
+
+    } catch (error) {
+        console.error("Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+module.exports = app; // Export for Vercel
