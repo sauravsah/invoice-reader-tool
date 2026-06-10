@@ -1,71 +1,111 @@
 const express = require('express');
 const multer = require('multer');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const OpenAI = require('openai');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const path = require('path');
-const upload = multer({ storage: multer.memoryStorage() }); // Store files in memory
+const upload = multer({ storage: multer.memoryStorage() });
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+// Initialize OpenAI
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+});
 
-// Serve static files from 'public' folder
+// Serve static files
 app.use(express.static('public'));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Analyze Invoice Endpoint
 app.post('/analyze', upload.single('invoice'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No invoice image provided' });
+            return res.status(400).json({
+                error: 'No invoice image provided'
+            });
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        // Convert buffer to base64
+        // Convert uploaded image to Base64
         const imageBase64 = req.file.buffer.toString('base64');
 
         const prompt = `
-          You are an API that extracts structured data from invoices.
-          Analyze this image and return ONLY a JSON object. Do not include markdown formatting.
-          
-          Extract:
-          - vendor_name
-          - invoice_date (YYYY-MM-DD)
-          - total_amount
-          - currency
-          - items (array: description, amount)
-        `;
+You are an API that extracts structured data from invoices.
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    data: imageBase64,
-                    mimeType: req.file.mimetype,
-                },
-            },
-        ]);
+Analyze this invoice image and return ONLY a valid JSON object.
 
-        const response = await result.response;
-        const text = response.text();
-        
-        // Clean up markdown code blocks if present
-        const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        
-        res.json(JSON.parse(cleanText));
+DO NOT include:
+- Markdown
+- Explanations
+- Code blocks
+- Extra text
+
+Return JSON in exactly this format:
+
+{
+  "vendor_name": "string",
+  "invoice_date": "YYYY-MM-DD",
+  "total_amount": number,
+  "currency": "string",
+  "items": [
+    {
+      "description": "string",
+      "amount": number
+    }
+  ]
+}
+
+If a value is missing, return null.
+`;
+
+        const response = await openai.responses.create({
+            model: "gpt-4.1-mini",
+            input: [
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "input_text",
+                            text: prompt
+                        },
+                        {
+                            type: "input_image",
+                            image_url: `data:${req.file.mimetype};base64,${imageBase64}`
+                        }
+                    ]
+                }
+            ]
+        });
+
+        const text = response.output_text;
+
+        // Remove markdown if model accidentally adds it
+        const cleanText = text
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .trim();
+
+        const invoiceData = JSON.parse(cleanText);
+
+        res.json(invoiceData);
 
     } catch (error) {
-        console.error("Error:", error);
-        res.status(500).json({ error: error.message });
+        console.error('OpenAI Error:', error);
+
+        res.status(500).json({
+            error: error.message
+        });
     }
 });
 
 if (require.main === module) {
     const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
 }
 
-module.exports = app; // Export for Vercel
+module.exports = app;
